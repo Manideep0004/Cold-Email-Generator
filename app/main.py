@@ -1,10 +1,10 @@
 import streamlit as st
 
-# ✅ MUST be first Streamlit command
+# Must be first Streamlit command
 st.set_page_config(
-    layout="wide",
-    page_icon="🤑",
-    page_title="Email Generator"
+    page_title="Cold Email Generator",
+    page_icon="🚀",
+    layout="wide"
 )
 
 import pandas as pd
@@ -12,99 +12,76 @@ from langchain_community.document_loaders import WebBaseLoader
 from chains import Chain
 from portfolio import Portfolio
 
-# --- Custom CSS for style ---
+
 st.markdown("""
-    <style>
-        .main { background-color: #f7f7f7; }
-        h1 { color: #ff4b4b; }
-        .stTextInput > div > div > input {
-            border: 2px solid #ff4b4b;
-            border-radius: 8px;
-        }
-        .stButton > button {
-            background-color: #ff4b4b;
-            color: white;
-            border-radius: 8px;
-            padding: 0.5em 1em;
-        }
-        .stButton > button:hover {
-            background-color: #d63c3c;
-            color: white;
-        }
-    </style>
+<style>
+    .main { background-color: #f7f7f7; }
+    h1 { color: #ff4b4b; }
+    .stButton > button {
+        background-color: #ff4b4b;
+        color: white;
+        border-radius: 8px;
+    }
+</style>
 """, unsafe_allow_html=True)
+
 
 def create_stream_app(llm, portfolio):
     st.title("🚀 Cold Email Generator")
-    st.markdown("**Enter a job listing URL and let the AI craft tailored cold emails.**")
+    st.markdown("Enter a job listing URL and generate tailored cold emails.")
 
-    col1, col2 = st.columns([3, 1])
-    with col1:
-        url_input = st.text_input("🌐 Job Listing URL:", 
-            value="https://jobdetails.nestle.com/job/Esplugues-Llobregat-Technology-Expert-R&D-Information-Technology-B-08950/1204832601/?feedId=256801"
-        )
-    with col2:
-        submit_button = st.button("🔥 Generate Emails")
+    url = st.text_input(
+        "Job Listing URL",
+        value="https://jobdetails.nestle.com/job/Esplugues-Llobregat-Technology-Expert-R&D-Information-Technology-B-08950/1204832601/"
+    )
 
-    if submit_button:
-        with st.spinner("🧠 Thinking... extracting jobs & crafting emails..."):
+    if st.button("Generate Emails"):
+        with st.spinner("Processing..."):
             try:
-                loader = WebBaseLoader([url_input])
-                data = loader.load().pop().page_content
-                portfolio.load_portfolio()
-                jobs = llm.extract_jobs(data)
+                loader = WebBaseLoader([url])
+                content = loader.load()[0].page_content
 
-                email_records = []
+                portfolio.load_portfolio()
+                jobs = llm.extract_jobs(content)
+
+                records = []
 
                 for job in jobs:
-                    # Get job details with fallbacks
-                    title = job.get('title') or job.get('role') or 'Untitled Role'
-                    skills = job.get('skills', [])
-                    
-                    # Handle skills formatting
+                    title = job.get("role", "Unknown Role")
+                    skills = job.get("skills", "")
+
                     if isinstance(skills, str):
-                        skills = [s.strip() for s in skills.split(',') if s.strip()]
-                    elif not isinstance(skills, list):
-                        skills = []
-                    
-                    # Only query portfolio if skills exist
-                    if skills:
-                        links = portfolio.query_links(skills)
-                    else:
-                        links = []
-                        st.warning(f"⚠️ No skills found for {title}")
-                    
+                        skills = [s.strip() for s in skills.split(",") if s.strip()]
+
+                    links = portfolio.query_links(skills) if skills else []
                     email = llm.write_mail(job, links)
 
-                    st.subheader(f"💼 {title}")
-                    st.markdown(f"**Skills Required:** {', '.join(skills) if skills else 'N/A'}")
-                    st.code(email, language='markdown')
+                    st.subheader(title)
+                    st.markdown(f"**Skills:** {', '.join(skills) if skills else 'N/A'}")
+                    st.code(email)
 
-                    email_records.append({
-                        "Job Title": title,
+                    records.append({
+                        "Role": title,
                         "Skills": ", ".join(skills),
                         "Email": email
                     })
 
-                if email_records:
-                    df = pd.DataFrame(email_records)
-                    csv = df.to_csv(index=False).encode('utf-8')
+                if records:
+                    df = pd.DataFrame(records)
                     st.download_button(
-                        label="📥 Download All Emails as CSV",
-                        data=csv,
-                        file_name="generated_emails.csv",
-                        mime="text/csv"
+                        "Download CSV",
+                        df.to_csv(index=False),
+                        "emails.csv",
+                        "text/csv"
                     )
 
             except Exception as e:
-                st.error(f"❌ An Error Occurred: {e}")
-                st.info("💡 Please check if the URL is accessible and contains job information.")
+                st.error(f"Error: {e}")
 
-if __name__ == "__main__":
-    try:
-        chain = Chain()
-        portfolio = Portfolio()
-        create_stream_app(chain, portfolio)
-    except Exception as e:
-        st.error(f"❌ Failed to initialize application: {e}")
-        st.info("💡 Please check if all required files are present and properly configured.")
+
+try:
+    chain = Chain()
+    portfolio = Portfolio()
+    create_stream_app(chain, portfolio)
+except Exception as e:
+    st.error(str(e))
