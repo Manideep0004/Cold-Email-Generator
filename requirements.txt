@@ -1,10 +1,10 @@
 streamlit
+pandas
+langchain
 langchain-groq
 langchain-community
-langchain-core
-pandas
-chromadb
-beautifulsoup4
-requests
+chromadb>=1.0.21
+pydantic>=2.7.4
+pydantic-settings
 python-dotenv
-uuid
+numpy>=2.0.0
